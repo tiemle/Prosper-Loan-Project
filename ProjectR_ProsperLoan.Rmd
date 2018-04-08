@@ -1,0 +1,999 @@
+---
+title: "Prosper Loan Data"
+author: "Anh Le"
+date: "3/20/2018"
+output:
+  html_document:
+    fig_height: 8
+    fig_width: 10
+    theme: spacelab
+  word_document: default
+---
+
+##Introduction
+=========================================================================================================
+
+Prosper Marketplace is America's first peer-to-peer lending marketplace, with 
+over $ 7 billions in funded loans. Borrowers request personal loans on Prosper 
+and investors (individual or institutional) can fund anywhere from $2,000 to 
+$35,000 per loan request. Investors can consider borrowers’ credit scores, 
+ratings, and histories and the category of the loan. Prosper handles the s
+ervicing of the loan and collects and distributes borrower payments and interest 
+back to the loan investors.
+
+A personal loan is an unsecured loan typically from $1,000 - $100,000 with fixed 
+or variable interest rates that can be used to make a large purchase (medical procedure, home improvement, engagement ring, wedding, baby or other major life 
+events) or to consolidate debt such as credit card, for example. 
+
+Prosper has a transaction-based business model, in which the company collects 
+revenue by taking a fee on its customers' transactions. Borrowers who receive a 
+loan, pay an origination fee of 1.00% to 5.00%,depending on the borrower's 
+Prosper Rating, and investors pay a 1% annual servicing fee.Every loan 
+application is assigned a Prosper Rating—a proprietary rating system that allows 
+for consistency in the evaluation of applicants. Potential investors use Prosper Ratings to help decide whether to commit to invest in your loan listing.
+
+I chose Prosper Loan data to analyze because I am very fascinated with the 
+amounts of personal loans they offer and curious about the market Prosper is 
+interested in. How does Prosper set interest rate? What makes investors want to 
+invest in these short term notes.  I wonder what kind of risks and returns 
+associated with these loans? As the borrower's status changed, such as 
+employment, marital status or spending habits, will the risk of default 
+increase?  I will be more curious and post more questions as I go deeper into 
+the analysis. 
+
+**Data Set of Choice:**
+=========================================================================================================
+
+ProsperLoanData is one of the data set suggested by Udacity for the R Analysis 
+project
+
+*[Available at:] 
+
+(https://s3.amazonaws.com/udacity-hosted-downloads/ud651/prosperLoanData.csv)
+
+*[Variable Definitions availble at:]
+(https://docs.google.com/spreadsheets/d/1gDyi_L4UvIrLTEC6Wri5nbaMmkGmLQBk-
+Yx3z0XDEtI/edit#gid=0)
+
+**Prepare environment: Loading appropriate libraries to conduct the analysis.**
+=========================================================================================================
+
+```{r Prepare_environment, echo=FALSE, message=FALSE, warning=FALSE}
+
+setwd("./")  #set the working directory to the default directory for the user
+
+suppressMessages(library(knitr))
+suppressMessages(library(dplyr))
+suppressMessages(library(lubridate))
+suppressMessages(library(ggplot2))
+suppressMessages(library(gridExtra))
+suppressMessages(library(reshape2))
+suppressMessages(library(GGally))
+suppressMessages(library(scales))
+suppressMessages(library(memisc))
+suppressMessages(library(lattice))
+suppressMessages(library(MASS))
+suppressMessages(library(car))
+suppressMessages(library(RColorBrewer))
+suppressMessages(library(bitops))
+suppressMessages(library(RCurl))
+suppressMessages(library(kableExtra))
+options(knitr.table.format = "html") 
+theme_set(theme_bw())
+suppressMessages(library(forcats))
+xaxis_theme <- theme(axis.text.x = element_text(face = "bold", color = "black", 
+                           size = 8, angle = -90),
+          axis.text.y = element_text(face = "bold", color = "black", 
+                           size = 8, angle = 45))
+
+```   
+**Load data: Produce high level overview of data**
+=========================================================================================================
+
+* Read the data into a data frame: Name the file loanData.  This data contains 
+113,937 observations and 81 variables.
+* Use summary() function to summarize the loan data to get a sense for the loan 
+details such as overall credit ratings, prosper's ratings, states borrowers live 
+in, Term of loans, Loan status, occupation, employment status, debt to income 
+ratio, Income range, Investor's range, mean and median of the applicable 
+variables.
+
+**Review of initial exploration**
+=========================================================================================================
+
+```{r echo=FALSE, Load_Data, message=FALSE, warning=FALSE}
+
+loanData <- read.csv('prosperLoanData.csv', header = T, check.names = F)
+
+```
+
+=========================================================================================================
+
+Since Prosper claimed that they have originated over $9 billions in consumer 
+loans (to date), I want to see what kind of distributions of the loan counts 
+over the years by LoanOriginationQuarter.
+
+The plot did not come out as I wanted because it's sorted by quarter and then by 
+year.  I have to change the order of the factor levels by specifying the order explicity. After applying this code, ggplot now understands in which order to 
+plot my LoanOriginationQuarter on \(x\) axis.
+
+**Univariate Analysis of the loan trending by Loan Origination Quarter**
+=========================================================================================================
+
+```{r echo=FALSE, Univariate_Plots, message=FALSE, warning=FALSE}
+
+# to change the order of the factor level so that it's sorted by year, not by 
+# quarter.
+
+loanData$LoanOriginationQuarter <- factor(loanData$LoanOriginationQuarter, 
+                                          levels = sort(unique(loanData$LoanOriginationQuarter)), 
+                                          ordered = TRUE)
+
+loanData$LoanOriginationQuarter2 <- as.character(as.factor(loanData$LoanOriginationQuarter))
+
+#loanData$LoanOriginationQuarter2 = lapply(loanData$LoanOriginationQuarter2, 
+#gsub, pattern = " ", replacement = "", fixed = TRUE)
+  
+SumLoanOriginationQuarter <- loanData %>% 
+  group_by(LoanOriginationQuarter) %>% 
+  summarise(LoanByQuarter = sum(LoanOriginalAmount))
+
+# create a plot by loan amounts issued by quarter/year.
+p1 <- ggplot(aes(x = LoanOriginationQuarter, y = LoanByQuarter), 
+             data = SumLoanOriginationQuarter) +
+              geom_col(color = 'blue', fill = 'gold') +
+              ggtitle('Distribution of Personal Loans in Years (USD)') +
+              xlab('Year by Quarter') +
+              ylab('Number of Loans') +
+              xaxis_theme
+
+p1
+
+summary(loanData$LoanOriginationQuarter)
+
+```
+
+=========================================================================================================
+
+From this graph, since the inception in Q4 2005, the number of loans grown 
+nicely per quarter, from 22 to almost 4344 loans until Q4 2008.  In Q4 2008, it 
+only had about 532 loans and then almost nothing until Q4 2009. It took 4 years, 
+till Q1 2012, for Prosper to get back to the same (# of loans) level as of Q2 
+2008. 
+
+I wonder what happened and found that on November 24, 2008, the SEC found 
+Prosper to be in violation of the Securities Act of 1933. As a result of these findings, the SEC imposed a cease and desist order on Prosper. Due primarily to 
+the novel nature of the peer-to-peer lending models, the SEC, after review, now 
+treats all peer-to-peer lending transactions as sales of securities and requires 
+that all platforms register with the SEC.  In addition to this violation, on 
+November 26, 2008, a class action lawsuit was filed against Prosper in CA.  I 
+believe these events had negatively impact Prosper's ability to motivate 
+consumers and investors to borrow and fund the loans respectively.  
+
+**Univariate Analysis of Prosper Score, Loan Status and Borrower Rate- Annually**
+
+Since its SEC registration in 2009, Prosper has provided a proprietary 
+"Prosper Rating" for prospective borrowers based on the company's estimation of 
+that borrower's "estimated loss rate." According to the company, that figure is "determined by two scores: (1) the credit score, obtained from an official 
+credit reporting agency, and (2) the Prosper Score, figured in-house based on 
+the Prosper population." Prosper Ratings, from lowest-risk to highest-risk, are 
+labeled AA, A, B, C, D, E, and HR ("High Risk").  Prosper Score, a custom risk 
+score built using historical Prosper data. The score ranges from 1-11, with 11 
+being the best, or lowest risk score. Applicable for loans originated after July 
+2009.
+
+*Prosper rating	Estimated Average
+*                Annual Loss Rate
+*AA	            0.00–1.99%
+*A	              2.00–3.99%
+*B	              4.00–5.99%
+*C	              6.00–8.99%
+*D	              9.00–11.99%
+*E	              12.00–14.99%
+*HR	            15.00%+
+
+Part of the data wrangling and tidy to make the graphs work, are to rename some 
+of the variables because it's has the parenthesis around it. These following 
+codes take care of this problem.
+
+* names(loanData)[14:15] <- c("Prosper_rating_Num", "Prosper_rating_Alpha")
+* names(loanData)[names(loanData) == "ListingCategory (numeric)"] <- 
+"ListingCategory"
+
+=========================================================================================================
+
+```{r echo=FALSE, Prosper_Score_Plot , message=FALSE, warning=FALSE}
+# Change the variable names to make it work.
+names(loanData)[14:15] <- c("Prosper_rating_Num", "Prosper_rating_Alpha")
+names(loanData)[names(loanData) == "ListingCategory (numeric)"] <- 
+  "ListingCategory"
+
+p2 <- ggplot(aes(x = ProsperScore), data = loanData) + 
+            geom_bar(color = 'blue', fill = 'yellow') +
+            ggtitle('Prosper Borrower Score') +
+            xlab('Prosper Score') +
+            ylab('Number of Loans') +
+            xaxis_theme
+
+p2
+
+summary(loanData$ProsperScore)
+
+```
+
+=========================================================================================================
+
+The Prosper Borrower's Score is a normal distribution with the mean = 5.95 and 
+median = 6. There were none at 1 (worse) or at 11 (best).
+
+=======================================================================================================
+
+```{r echo=FALSE, Loan_Status_Plot , message=FALSE, warning=FALSE}
+
+p3 <- ggplot(aes(x = LoanStatus), data = loanData) +
+            geom_histogram(binwidth = 10, stat = "count", color = 'red', 
+                           fill = 'yellow') +
+            ggtitle('Distribution of Loan Status') +
+            xlab('Loan Status') +
+            ylab('Number of Loans') +
+            xaxis_theme
+
+p3
+
+summary(loanData$LoanStatus)
+
+```
+
+=======================================================================================================
+
+The plot of the Loan Status surprised me in that most of the loans are Current (58,000); Completed is about 38,000 with Charged Off around 11,000 loans.  The 
+plot is skewed to the left with long tail on the right for the past due amounts 
+in days.  The charged off is about 10% of the total Prosper number of loans, 
+this is a very high risk business but they are probably making it up by imposing 
+such high interest rates and to attrack investors.  Let's look at that next.
+
+=======================================================================================================
+
+```{r echo=FALSE, BorrowerRate_Plot , message=FALSE, warning=FALSE}
+
+p4 <- ggplot(aes(x = BorrowerRate * 100), data = loanData) +
+      geom_point(stat = "count", color = 'red', fill = 'blue') +
+      ggtitle('Distribution of Borrower Rate') +
+      xlab('Borrower Rates') +
+      ylab('Number of Loans') +
+      xaxis_theme
+
+p4
+
+by(loanData$BorrowerRate, loanData$Term,summary)
+
+```
+
+=========================================================================================================
+
+As expected, the interest rate is pretty high and there was a spike at rate 32%.  
+The mean for borrower's interest rate is 19.28%.  However, it does not look righ 
+since I also saw some above 50%?  
+
+In the loan term of 36 months, the max is 49.75%.  49.75% is outliner, 
+I will focus on the majority of loan rates, which are in the range of 6% to 35%. 
+To do this, I will transform the data using log10().
+
+=========================================================================================================
+
+```{r echo=FALSE, BorrowerRate_plot1, message=FALSE, warning=FALSE}
+
+# transform with log10()
+p5 <- ggplot(aes(x = LoanOriginalAmount, y = BorrowerRate * 100), 
+             data = loanData) +
+            geom_point(color = 'blue', alpha = 1/50) +
+            geom_smooth(color = 'black') +
+            scale_x_log10() +
+            ggtitle('Distribution of Borrower Rate') +
+            ylab('Borrower Rates ranges 6% - 35%') +
+            xlab('Number of Loans') +
+            xaxis_theme
+p5
+
+```
+
+=========================================================================================================
+
+Majority of the loans interest rates are well above 15%, between 15% to 20%.  
+
+Next, I want to look at the listing Category to figure out why borrowers are 
+willing to pay for these high interest rates.
+
+The category of the listing that the borrower selected when posting their l
+isting: 0 - Not Available, 1 - Debt Consolidation, 2 - Home Improvement, 
+3 - Business, 4 - Personal Loan, 5 - Student Use, 6 - Auto, 7- Other, 8 - Baby&Adoption, 9 - Boat, 10 - Cosmetic Procedure, 11 - Engagement Ring, 
+12 - Green Loans, 13 - Household Expenses, 14 - Large Purchases, 
+15 - Medical/Dental, 16 - Motorcycle, 17 - RV, 18 - Taxes, 19 - Vacation, 
+20 - Wedding Loans
+
+=========================================================================================================
+
+```{r echo=FALSE, listing_catogory_plot1, message=FALSE, warning=FALSE}
+
+p6 <- ggplot(aes(x = factor(ListingCategory)), data = loanData) +
+            geom_bar(color = 'blue', fill = 'green') +
+            ggtitle('Borrower Listing Category and by Term') +
+            xlab('Listing Category') +
+            ylab('Number of Loans') +
+            xaxis_theme
+p6
+
+summary(loanData$ListingCategory)
+
+```
+
+=========================================================================================================
+
+Most loan's terms are 36 months or 60 months in duration.  Majority of the loans 
+from both terms are used for their Debt Consolidations (= 1), the next highest 
+category is Unknown (= 7), then Home Improvement (=2) and Business (=3).  The 
+plots skew to the left, with long tails on the right. 
+
+Now, I just want to see what the plots look like on loans with 36 and 60 months 
+terms. To do this, I will create a subset to omit loans with 12 month terms & 
+Category Listing is < 7, which are the majority of the loan listings.
+
+=========================================================================================================
+
+```{r echo=FALSE, listing_catogory_plot2, message=FALSE, warning=FALSE}
+# transform the listing category
+p7 <- ggplot(aes(x = factor(ListingCategory)), 
+             data = subset(loanData,loanData$Term > 12 & 
+                             loanData$ListingCategory < 8)) +
+              geom_bar(color = 'blue', fill = 'yellow') +
+              ggtitle('Major Loan Listing Category') +
+              xlab('Listing Category') +
+              ylab('Number of Loans') +
+              xaxis_theme
+ 
+p7
+
+```
+
+=========================================================================================================
+
+Interestingly, most of the loans were used for debt consolidation.  I thought 
+credit card interest rates were high but if borrowers paid for Prosper's rates 
+instead of paying for their credit cards, how does having a loan with Prosper 
+help them financially?  
+
+Let's look at what their Credit Card Revolving Balance and Prosper Loan amount 
+and its monthly payments.  I will plots these following:
+* a) The Total Revolving Credit Card Balance for the individuals with Prosper 
+Loan.
+* b) The Prosper Loan amount (who used it for Debt Consolidation)
+* d) The monthly payments with Prosper, assuming that their Credit Card Balance i
+s reduced by the loan amounts from Prosper.
+
+**Bivariate Analysis of Borrower's Revolving credit card balance**
+=========================================================================================================
+
+```{r echo=FALSE, bivariate_Plot1, message=FALSE, warning=FALSE}
+
+p8 <- ggplot(aes(x = RevolvingCreditBalance),data = loanData) +
+              geom_histogram(color = "blue") +
+              ggtitle('Revolving Credit Card Balance (USD)') +
+              xlab('Revolving Credit Card Balance') +
+              ylab('Total Borrowers') +
+              xaxis_theme
+
+p8
+```
+
+=========================================================================================================
+
+* Transformed the above plot to focus on majority of the borrower's balances
+
+=========================================================================================================
+
+```{r echo=FALSE, revolvingCC, message=FALSE, warning=FALSE}
+# use x-log10() to transform the data, eliminating outliners
+p9 <- ggplot(aes(x = RevolvingCreditBalance),data = loanData) +
+              geom_histogram(color = "red") +
+              scale_x_continuous(limits = c(3000,25000), 
+                                 breaks = seq(3000,25000,5000)) +
+              ggtitle('Revolving Credit Card Balance (USD)') +
+              xlab('Revolving Credit Card Balance') +
+              ylab('Total Borrowers') +
+              xaxis_theme
+p9
+
+ p9a <- ggplot(aes(x = RevolvingCreditBalance),data = loanData) +
+              geom_histogram(color = "red") +
+              scale_x_continuous(limits = c(3000,25000), 
+                                 breaks = seq(3000,25000,5000)) +
+              scale_x_log10() +
+              ggtitle('Revolving Credit Card Balance (USD)') +
+              xlab('Revolving Credit Card Balance') +
+              ylab('Total Borrowers') +
+              xaxis_theme
+ p9a
+
+summary(loanData$RevolvingCreditBalance)
+```
+=========================================================================================================
+* Majority of borrower's revolving credit card balances are between 3000 to 
+23000.  The plot is skewed to the left.  
+
+Applying the scalexlog10(), the Revolving Credit Balance looks like a normal distribution.
+
+**Bivariate Analysis of Borrower's Debt Consolidation**
+=========================================================================================================
+```{r echo=FALSE, bivariate_Plot2, message=FALSE, warning=FALSE}
+
+debt_consol <- loanData %>% 
+  group_by(Term > 12) %>% 
+  group_by(ListingCategory == 1) %>% 
+  summarise(loan_amount_mean = mean(LoanOriginalAmount),
+            loan_amount_median = median(LoanOriginalAmount),
+            n = n())
+
+debt_consol
+# Debt consolidation loan with terms > 12 months
+p10 <- ggplot(aes(x = LoanOriginalAmount),
+                data = subset(loanData, loanData$Term > 12 & 
+                                loanData$ListingCategory == 1)) +
+                geom_histogram(color = "purple") + 
+                ggtitle('Debt Consolidation Loans (USD)') +
+                xlab('Debt Consolidation') +
+                ylab('Total numbers of Loans') +
+                xaxis_theme
+
+p10
+
+```
+=========================================================================================================
+
+* For those who applied for Prosper Loans and used it as debt consolidation, the 
+loan amount mean is $9908 and loan amount median is $9500 with 58,308 loans.
+
+=========================================================================================================
+```{r echo=FALSE, bivariate_deb_cons, message=FALSE, warning=FALSE}
+# Use transform to view loans < $20000
+p11 <- ggplot(aes(x = LoanOriginalAmount),
+                data = subset(loanData, loanData$Term > 12 & 
+                                loanData$ListingCategory == 1)) +
+                geom_histogram(color = "blue") +
+                scale_x_continuous(limits = c(1000,16000), 
+                                   breaks = seq(1000,16000,2000)) + 
+                ggtitle('Debt Consolidation Loans (USD)') +
+                xlab('Debt Consolidation') +
+                ylab('Total numbers of Loans') +
+                xaxis_theme
+
+p11
+
+by(loanData$MonthlyLoanPayment, loanData$ListingCategory == 1, summary)
+```
+=========================================================================================================
+* 
+*Most borrowers prefer to have a 36 months loan, over 60 months and 12 months.
+The plot shows the amount of loans used for debt consolidation is mostly in the 
+range of $10,000  - or under.
+
+Prosper's interest rates are much higher than the Revolving Credit Card's rates, however, when consolicated into one low monthly payments, it seems to work for borrowers.
+
+For borrowers who use the Prosper Loan's money to consolidate their debt: The 
+median of their monthly payment is 283, mean is 313.8 and the max is 2,252.  
+For the rest, montly payment median is at 172.8, mean at 229.1 and max is 2179.
+Also, if you notice, there is a break accross the plot where there is no loan 
+provided accross the loan amounts (white line on the top of the plot).  It's 
+related to the 2008 period we talked about earlier.
+
+The plot is skewed to the left, with long tail on the right. 
+
+**Debt Consolidation and Prosper loan monthly payment Analysis**
+=========================================================================================================
+```{r echo=FALSE, bivariate_Plot3, message=FALSE, warning=FALSE}
+p12 <- ggplot(loanData,aes(MonthlyLoanPayment, LoanOriginalAmount)) + 
+              geom_point(alpha = 1/20, color = 'red') + 
+              geom_smooth(color = 'black') +
+              ggtitle('Prosper Loan Monthly Paymennt (USD)') +
+              xlab('Prosper Loan Monthly Payment') +
+              ylab('Loan Amounts') +
+              xaxis_theme
+p12
+
+```
+=========================================================================================================
+
+Transform the above plot and focus on majority of loans with payments < 1000 & 
+loan less than 25000
+
+```{r echo=FALSE, bivariate_monthly_pymt, message=FALSE, warning=FALSE}
+p13 <- ggplot(aes(x = MonthlyLoanPayment, y = LoanOriginalAmount), 
+              data = loanData) + 
+        geom_point(color = I('blue'), fill = I('#F79420')) +
+        xlim(50,1000) +
+        ylim(200,25000) +
+        geom_smooth(color = 'red') +
+        ggtitle('Prosper Loan Monthly Paymennt (USD)') +
+        xlab('Prosper Loan Monthly Payment') +
+        ylab('Loan Amount') +
+        xaxis_theme
+p13
+
+summary(loanData$MonthlyLoanPayment)
+
+```
+
+=========================================================================================================
+
+Majority of the loans with monthly payment of less than $1000.
+
+**Debt Consolidation Analysis**
+=========================================================================================================
+
+```{r echo=FALSE, Univariate_Plot_monthlyPayment,message = FALSE, warning = FALSE }
+
+payment_selected <- loanData %>% 
+  filter(ListingCategory == 1) %>% 
+  dplyr::select(RevolvingCreditBalance, OpenRevolvingMonthlyPayment,
+                LoanOriginalAmount, MonthlyLoanPayment)
+
+summary(loanData$OpenRevolvingMonthlyPayment)
+```
+=========================================================================================================
+
+The open revolving credit card payment plot is skewed to the left with a very 
+long tail to the right.  I can't tell much from looking at this plot.
+
+The plot to the right is a transformation of the original one, using 
+scale_x_log10(). 
+
+And the 2 plots are shown side by side for trending comparison.
+=========================================================================================================
+
+```{r echo=FALSE, Revolving_paymet,message = FALSE, warning = FALSE }
+# borrower's credit card payment monthly
+p15 <- ggplot(loanData,aes(x = OpenRevolvingMonthlyPayment)) +
+                            geom_histogram(color = 'red') +
+                            ggtitle('Revolving Monthly Paymennt (USD)') +
+                            xlab('Revolving Monthly Payment') +
+                            ylab('Loan Amount') +
+                            xaxis_theme
+
+
+#Transform Credit Card payments
+p16 <- ggplot(loanData,aes(x = OpenRevolvingMonthlyPayment)) +
+                            geom_histogram(color = 'purple') +
+                            scale_x_log10() +
+                            ggtitle('Revolving Monthly Paymennt (USD)') +
+                            xlab('Revolving Monthly Payment') +
+                            ylab('Loan Amount') +
+                            xaxis_theme
+
+
+# Summary for Revolving Monthly Payment 
+summary(loanData$OpenRevolvingMonthlyPayment)
+
+grid.arrange(p15, p16, ncol = 2)
+
+```
+
+=========================================================================================================
+
+This analysis is important to me because it's satisfied my curiousity of why 
+borrowers pay higher interest rates than their credit cards.
+
+I filter the Listing Category of Debt Consolidation, then select the Revolving 
+Credit Balance, its monthly payments vs. Prosper's original loan amount and its 
+monthly payments.  The summary and plots clearly show that Prosper monthly payments are much more affordable for borrowers, with mean of 272.5 vs. 398 for their 
+Revolving Credit Card.
+
+Let's look at borrower's employment status, their stated monthly income and 
+Prosper's loan amount by their employment status.
+
+**Employment Status, Prosper Loan Amount**
+=========================================================================================================
+
+```{r echo=FALSE, bivariate_employment, message=FALSE, warning=FALSE}
+
+loanData %>% 
+  group_by(EmploymentStatus) %>% 
+    summarise(mean_monthly_Income = mean(StatedMonthlyIncome),
+            median_monthly_Income = median(StatedMonthlyIncome),
+            n = n())
+ 
+p17 <- ggplot(loanData,aes(EmploymentStatus, LoanOriginalAmount)) +
+              geom_boxplot(color = 'blue', fill = 'red') +
+              ggtitle('Prosper Loan Amount in USD by Employment Status') +
+              ylab('Prosper Loan Amount') +
+              xlab('Employment Status') +
+              xaxis_theme
+
+
+p18 <- ggplot(loanData,aes(EmploymentStatus, StatedMonthlyIncome)) +
+              geom_boxplot(color = 'blue', fill = 'red') +
+              ggtitle('Borrower Monthly Income (USD) by Employment Status') +
+              ylab('StatedMonthlyIncome') +
+              xlab('Employment Status') +
+              xaxis_theme
+
+
+with(loanData,cor.test(loanData$ProsperScore,loanData$BorrowerRate, 
+                       method = "pearson"))
+
+grid.arrange(p17,p18,ncol = 2)
+     
+```
+
+=========================================================================================================
+
+Looking at the summary group by Employment Status and the monthly stated income 
+of borrowers, it seems this market dealt with borrowers in the high risks end of 
+the spectrum.  
+
+They provided loans for borrowers with employment status of "not availbale", 
+"not employed", "none" and "Other".
+
+It seems Prosper has very lenient policies as opposed to guidelines imposed by 
+normal baking industry.  I believe it's because Prosper is not at risk but the investors.  I want to investigate further on this.  Investors attrack to the 
+higher return, of course, that come with higher risks. So, let's look at the 
+analyses from the Investor's perspective. 
+
+**Is there any correlation between Borrower's rates and Prosper's ratings**
+
+To answer this question, I used the cor.test to test the two 
+mentioned-relationships above.
+
+* with(loanData,cor.test(loanData$ProsperScore,loanData$BorrowerRate, method = "pearson"))
+
+The results are listed below:
+
+	Pearson's product-moment correlation
+
+* data:  loanData$ProsperScore and loanData$BorrowerRate
+* t = -248.98, df = 84851, p-value < 2.2e-16
+* alternative hypothesis: true correlation is not equal to 0
+* 95 percent confidence interval:
+*  -0.6536072    -0.6458311
+* sample estimates: cor -0.6497361
+
+I think using the geom_jitter, it shows nicely the grouping of Prosper 
+borrower's scores in relation to the borrower interest rates. 
+
+There is a negative correlation between Borrower's Rates and Prosper's Score 
+of -.65.  The higher the borrower's rates, the lower Prosper's ratings (0 to 10).  
+As it's clearly shown in the plot and that is evidence in the smooth red line).
+
+With that in mind, I shall look at the Return Rate and Investors next.
+
+**Initial data exploration - Return of Investment**
+=========================================================================================================
+
+```{r echo=FALSE, Univariate_ReturnRate, message=FALSE, warning=FALSE}
+
+p19 <- ggplot(loanData,aes(EstimatedReturn)) + 
+              geom_histogram(color = 'yellow') +
+              ggtitle('Investor Estimated Return (USD) ') +
+              ylab('Prosper Loan Amount') +
+              xlab('Estimated Return Rate') +
+              xaxis_theme
+p19  
+
+summary(loanData$EstimatedReturn)
+
+```
+
+=========================================================================================================
+
+The mean of the rate of return is 9.6% with the max of 28.4%.  However, sometimes 
+they also have a negative rate of return too. 
+
+If that's the case, then are all the loans fully funded?  Let's find out. 
+
+I am going to create a new data frame call ReturnInvestment and contain the 
+following variables:
+
+* Mean_funded
+* Median_funded
+* min_funded
+* max_funded
+* n
+
+Let's look at the Investors next. 
+
+**Investors**
+=========================================================================================================
+
+```{r echo=FALSE, Plot_Investors, message=FALSE, warning=FALSE}
+loan_funded <- loanData %>% 
+  summarise(mean_funded = mean(PercentFunded),
+            median_funded = median(PercentFunded),
+            min_funded = min(PercentFunded),
+            max_funded = max(PercentFunded),
+            n = n())
+
+loan_funded
+
+Investors_Loan <- loanData %>% 
+  summarise(Mean_Investor = mean(Investors),
+            Meidan_Investor = median(Investors),
+            min_nvestors = min(Investors),
+            max_nvestors = max(Investors),
+            n = n())
+Investors_Loan
+
+```
+
+=========================================================================================================
+
+Wow, the result from the summary of Investors code surprises me. 
+
+Now I understand why Investors are willing to invest in these loans.  They all 
+share the risks and investors don't have to invest in one loan at a time.  They 
+can invest in many loans and with small amounts per loan.  Thus their risks are 
+also diversified.  They manage their risks like how people manage the stock 
+investment porfolios.  
+
+Lets look at sole investors, since I think this is the most risky area and 
+whether it's worth the risk.
+
+**Sole Investor data exploration - Estimated Return and Borrower's Debt to Income Ratio**
+=========================================================================================================
+
+```{r echo=FALSE, Univariate_Plot3 ,message=FALSE, warning=FALSE}
+
+sole_investors <- loanData %>% 
+  filter(Investors == 1) %>% 
+  dplyr::select(LoanOriginalAmount, EstimatedReturn, DebtToIncomeRatio)
+
+p21 <- ggplot(aes(x = LoanOriginalAmount,y = EstimatedReturn),
+              data = sole_investors) +
+              geom_boxplot(color = 'red') +
+              ggtitle('Sole Investor Estimated Return (USD)') +
+              xlab('Prosper Loan Amount') +
+              ylab('Estimated Return') +
+              xaxis_theme
+p21 
+
+```
+
+=========================================================================================================
+
+The reason I chose this analysis because as discovered from the previous 
+analysis of Investors, most of them don't solely invested in one loan but 
+multiple loans with small amounts.  Their risks are well diversified over the porfolios.  
+
+So by looking at these sole investors, we can see clearly that on 
+the average, their return of investment is below 10% but they are taking a higher 
+risk than if they invested in multiple loans for the same amount of funding.  
+The return is not higher but contain higher risk.  
+ 
+To conclude this project, I will create scatter plot matrices, by selecting seed 
+and subset to include only variables that I want to show.
+
+**Issue with ggpairs plot and selected variables**
+=========================================================================================================
+
+```{r echo=FALSE, ScatterPlotMatrices,message=FALSE, warning=FALSE}
+
+# select 5000 loan from the loan data with listing category = 1 and the amount 
+#of loan is < 10000.
+set.seed(100)
+sample.LoanAmount <- loanData[sample(1:length(loanData$LoanOriginalAmount < 10000 & loanData$ListingCategory == 1),5000),]
+
+# subset loan data and only picks variables i want to include in my model. 
+loanData_subset <- loanData[,c("Term","LoanStatus","BorrowerAPR",
+                               "EstimatedReturn","ProsperScore",
+                               "EmploymentStatus", 
+                               "DebtToIncomeRatio",       
+                               "LoanOriginalAmount", "Investors")]
+
+p22 <- ggpairs(loanData_subset[sample.int(nrow(loanData_subset),1000),],
+               size = 6)
+
+p22
+
+```
+
+========================================================================================================
+
+Since this is such big data, what I want to do is to select 5000 loans with loan 
+amount < 10000 and the listing selection is debt consolitation.  Then I subset 
+my loan data and pick only variables I think they have direct correlated to the investors' rate of return.  However, when plotting it using ggpairs, I have so 
+much problems with this single plot.  It took more than 12 hours to work on just 
+one.  I carefully used the same codes that i learned and went over the lessons 
+more than 10x just to figure out why the plot does not work. 
+
+Finally, I get it.  The lower left the triangle plot use the group histograms 
+for quantitative pairs and scatter plots for quantitative pairs.  The upper 
+triangle, use x and provide the correlation for quantitative quantitive pairs.  
+
+To wrap up this project, I want to build the lm model to see if the prediction 
+of the rate of return is closed to what Prosper said on their website.  I pick 
+one of the loan on the web site with funding required, that has the following 
+criteria:
+
+* Prosper rating: A
+* Loan Category: Debt Consolidation
+* Loan amount: $17000
+* rate of return: 6.99%
+* Borrower Rate: 7.99%
+* Monthly payment : $532.64
+* Borrower State: CA
+* Estimated Return: 4.4%
+* Listing Date: March 30, 2018
+
+I used the lm model to build the variables ProsperScore, ListingCategory, LoanOriginalAmount, BorrowerAPR, MonthlyLoanPayment.
+
+* m1 <- lm(EstimatedReturn ~ I(LoanOriginalAmount), 
+         data = loanData[loanData$LoanOriginalAmount <20000 & loanData$ListingCategory==1 & loanData$EstimatedReturn >0 
+         & loanData$ProsperScore > 7,])
+
+* m2 <- update(m1, ~ . + BorrowerAPR)
+* m3 <- update(m2, ~ . + MonthlyLoanPayment)
+* m4 <- update(m3, ~ . + ProsperScore)
+* m5 <- update(m4, ~ . + ListingCategor)
+
+* mtable(m1, m2, m3, m4, m5)
+
+Apply the lm model to Prosper current investment listing, using the criteria 
+listed
+
+* This_loan <- data.frame(LoanOriginalAmount = 17000, ProsperScore = 8, 
+ListingCategory = 1, MonthlyLoanPayment = 532.64, BorrowerAPR = 0.799, 
+EstimatedReturn = 0.44)
+
+Evaluate how well the prediction of return of investment from Prosper based on 
+the lm model. 
+
+* modelEstimate = predict(m5, newdata = This_loan, 
+                        interval = 'prediction', level = .95)
+                        
+It did not work as it created the following error.  I can't find anything 
+addressed this issue so I decided to use another approach as seen next.
+
+Warning message:
+In predict.lm(m5, newdata = This_loan, interval = "prediction",  :
+  prediction from a rank-deficient fit may be misleading
+  
+**Summary of the Result**  
+=========================================================================================================
+
+```{r echo=FALSE, Lm_predictiveRateOfReturn, message=FALSE, warning=FALSE}
+
+m1 <- lm(EstimatedReturn ~ I(LoanOriginalAmount), 
+         data = loanData[loanData$LoanOriginalAmount < 20000 & 
+                           loanData$ListingCategory == 1 & 
+                           loanData$EstimatedReturn > 0 & 
+                           loanData$ProsperScore > 7,])
+
+ m2 <- update(m1, ~ . + BorrowerAPR)
+ m3 <- update(m2, ~ . + EstimatedReturn)
+ m4 <- update(m3, ~ . + ProsperScore)
+ m5 <- update(m4, ~ . + ListingCategory)
+ mtable(m1,m2,m3,m4,m5)
+ 
+# use different method to look at the Estimated Return Rate
+
+dat = data.frame(m5$model, m5$residuals)
+
+with(dat, sd(m5.residuals))
+
+with(subset(dat, EstimatedReturn > .7 & EstimatedReturn < .1), sd(m5.residuals))
+
+dat$resid <- as.numeric(dat$m5.residuals)
+
+p23 <- ggplot(aes(y = resid, x = EstimatedReturn, .15), data = dat) + 
+              geom_point(alpha = 0.1) +
+              geom_line(stat = "summary", fun.y = sd, color = "red") +
+              ggtitle('Estimated Return Rate') +
+              xlab('Estimated Return Rate') +
+              ylab('Residuals') +
+              xaxis_theme
+
+p23
+
+```
+
+=========================================================================================================
+
+Using the predictive model, the plot resulted with the following error:
+
+In predict.lm(m6, newdata = This_loan, interval = "prediction",  :
+  prediction from a rank-deficient fit may be misleading
+  
+This is another challenge I am running into and I could not find anything on the 
+web to address this error.  I contacted my mentors but haven't heard back from 
+him either.  So I decided to try another method, because the predictive model 
+may not work anyway.  
+  
+The standard deviation summary is what I used.  The plot is showing the standard deviation summary of the residuals across Estimated Return Rate and we see the  residuals variability is not equal.
+
+The investors are attracted to these investments because their risks are very diversified.  They also get their investment back on a monthly basis.  They 
+could recover their cost first (because payments are mostly on interest first) 
+before the borrowers could default on their loans.  Prosper has a very smart 
+business model which help both the Investors and Borrowers at the same time.  
+
+**Final 3 Plots Summary**
+=========================================================================================================
+
+```{r echo=FALSE, last3Plots, message=FALSE, warning=FALSE}
+grid.arrange(p21, p2, p13, ncol = 1)
+```
+
+=========================================================================================================
+
+I chose 3 plots which represents the point of views from: The Investor, The 
+Borrower and Prosper Company. 
+
+* Plot 1, Investor's point of view: which show the Loan Amount (which is the 
+loan investment by Investors) and their rate of return.  It shows that this is a 
+risky market.  Bigger loan amounts do not mean higher yield and actually it's 
+the opposite.  Investors are doing better staying below $20000 range.  The return 
+of investment is about 9% on the average.
+
+* Plot 2, Prosper's point of view:  This plot shows the Borrower's rate of loan 
+against Prosper's ranking.  The better the score, the lower interest rates, 
+which is expected as a norm.
+
+* Plot 3, Borrower's point of view: This plot shows why Borrower's are willing 
+to pay higher interest rates to Prosper by consolidating their revolving credit 
+card debt.  With lower monthly payments, it is more affordable and that they 
+improve on their overall credit scores.  
+
+**Reflection**
+=========================================================================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+```
+
+When I chose this project, I did not know what to expect as I do not know 
+anything about Prosper.  As I work on it, I discovered things that are unusual, 
+such as there was no activities in the periods of 2008-2009.  So I did some 
+research and learned so much about them.  With this knowledge, I am able to 
+analyze its loan in a more intelligent ways.  
+
+Sometimes I put a hat on as a borrower to understand their view of points, why 
+they are willing to pay for higher rates than their current credit cards.  
+(This is one of my assumptions as I didn't know any credit cards with rates > 
+20%.) And why they think going with Prosper will benefit them?
+
+Sometimes I look at the data from an Investor point of view.  With borrowers 
+having such high credit card debts, low credit score, what makes Prosper 
+investment attractive?  All of these questions are unveiled when I get deeper 
+into the analysis and actually it surprised me quite a bit.  The results are 
+sometime not as I expected to see as already mentioned and explained in each 
+phase of the analysis.
+
+I ran into many challenges with the codes.  Most of the time, I can resolve it 
+by looking it up, went back to the class lessons or just try different ways.  
+It takes times to correct these issues but I also learned new things from it. 
+
+For example, the below code always resulted in an error.  As it does not 
+recognize the select() function.  I checked many times, refreshed, reviewed my 
+notes, review my lectures but nothing worked.  Then I google and found this 
+solution, by typing the code ls("package: MASS") and added dplyr:: before 
+select(), then it worked fine.  
+
+* suppressMessages(ls("package:MASS"))
+* Prosper_Loan_Payment <- loanData %>% 
+  filter(ListingCategory == 1) %>% 
+  dplyr::select(LoanOriginalAmount,MonthlyLoanPayment)
+
+I also had huge problem when running ggpairs at the very end of the project.  I 
+spent over 12 hours on that code alone.  I know I did not wisely spending my 
+time on the project.  I should move on and use another plot to get the project 
+done.  However, I could not let go because I wanted to understand why it did not 
+work.  I followed the instructions very well, checked for every single character 
+of my codes.  I used set.seed(), select sample from data and subset it.  It kept 
+saying that my codes are much larger than the 15 ? allowed?  But I did it at the 
+end and I am so happy about it.
+
+In summary, I am glad that I chose this data set to work on because first of all, 
+I don't drink and I don't know anything about wine.  Secondly, there were not 
+too many variables to analyze from the wine project.  This Proser Loan is 
+interesting and I think I can spend days to analyze it further.  There are so 
+mamy variables that I did not even touch.  They are all good variables with information that investors could use to analyze their investment of choice.  My curiousity just kicked in as I work on it further and deeper.  Sometimes I feel 
+like I am repeating but actually I am not.  You must look at it from the broad perspective first and then as you peel the onions, you discover things that you 
+did not expect to see.  That's exactly how I felt working on with this project. 
+
+=========================================================================================================
